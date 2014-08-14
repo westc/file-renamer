@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>File Renamer</title>
+    <script type="text/JavaScript" src="main.js"></script>
+    <script type="text/JavaScript" src="classes.js"></script>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  </head>
+  <body>
+    <div class="wrap">
+      <table class="height-100 width-100">
+        <tr>
+          <td class="height-1px">
+            <div class="header pad-5">
+              <table class="width-100">
+                <tr>
+                  <td class="width-99">
+                    <input type="text" id="txtDir" placeholder="Root Directory Path" readonly class="width-100" />
+                  </td>
+                  <td class="width-1px">
+                    <input type="button" id="btnDir" value="Choose Root Directory">
+                  </td>
+                </tr>
+              </table>
+
+              <div class="float-left width-50">
+                <div class="header-field-wrap">
+                  <div><label for="txtRegExp">Capturing Regular Expression (<a id="helpRegExp">help</a>):</label></div>
+                  <div><input type="text" id="txtRegExp" placeholder="/Ep (\d+)\.(\w+)/" class="width-100" /></div>
+                </div>
+              </div>
+
+              <div class="float-left width-50">
+                <div class="header-field-wrap">
+                  <div><label for="txtRepPat">Replacement Pattern (<a id="helpRepPat">help</a>):</label></div>
+                  <div><input type="text" id="txtRepPat" placeholder="Episodio ${1}.${2|lower}" class="width-100" /></div>
+                </div>
+              </div>
+
+              <div class="center">
+                <input type="button" id="btnMaskUnchanged" value="Mask Unchanged Files" />
+                <input type="button" id="btnMaskAll" value="Mask All Files" />
+                <input type="button" id="btnRename" value="Rename Files" />
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="height-99" style="padding-top: 5px;">
+            <div class="files-wrap height-100 auto-scroll">
+              <table id="tblFiles" class="files width-100">
+                <tr>
+                  <th>Current Filename</th>
+                  <th>Updated Filename</th>
+                </tr>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>

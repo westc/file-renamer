@@ -1,0 +1,657 @@
+<html>
+<head>
+<title>File Renamer</title>
+<HTA:APPLICATION APPLICATIONAME="C-DubbFileRenamer" BORDER="thck">
+<style>
+*{
+	font:9pt Tahoma, Arial;
+}
+BODY{
+	border:none;
+	margin:0;
+	overflow:hidden;
+}
+A{
+	text-decoration:none;
+}
+A:LINK, A:VISITED{
+	color:blue;
+}
+A:HOVER{
+	color:red;
+}
+FORM{
+	margin:0;
+}
+LABEL{
+	font-weight:bold;
+}
+TH *{
+	font-size:9pt;
+	font-weight:bold;
+}
+#tblBG{
+	height:100%;
+	position:absolute;
+	width:100%;
+	z-index:-2;
+}
+#tdBGTop{
+	filter:progid:DXImageTransform.Microsoft.Gradient(startColorstr=#88AAFF, endColorstr=white);
+	height:25%;
+}
+#tdBGBottom{
+	filter:progid:DXImageTransform.Microsoft.Gradient(startColorstr=white, endColorstr=#003399);
+	height:75%;
+}
+#divAll{
+	height:100%;
+	padding:10px;
+	width:100%;
+}
+#tblAll{
+	height:100%;
+	width:100%;
+}
+.textbox, .maskedTextbox{
+	border-width:1px;
+	font-size:8pt;
+	width:100%;
+}
+.maskedTextbox{
+	background:none;
+	border-width:0px;
+	cursor:pointer;
+	padding:2px;
+}
+#tblFiles .tdHilite .textbox{
+	background-color:white;
+	border:1px inset;
+	padding:1px;
+}
+#tblFiles .textbox{
+	background:none;
+	border:1px inset;
+	padding:1px;
+}
+#txtDir{
+	width:100%;
+}
+#divFiles{
+	border:1px solid black;
+	height:100%;
+	overflow:auto;
+	padding:1px;
+	position:absolute;
+	width:100%;
+	z-index:0;
+}
+#tblOptions{
+	background-color:#3399CC;
+	border:1px solid black;
+	filter:progid:DXImageTransform.Microsoft.Gradient(startColorstr=white, endColorstr=#66AAFF);
+	margin:0;
+	width:100%;
+}
+#tblFiles
+{
+	border-collapse:collapse;
+	width:100%;
+}
+#tblFiles TD{
+	border-bottom:1px solid black;
+	cursor:pointer;
+}
+#tblFiles TH{
+	border:1px solid black;
+	color:white;
+	filter:progid:DXImageTransform.Microsoft.Gradient(startColorstr=#99AAFF, endColorstr=black);
+	width:50%;
+}
+.tdHilite{
+	background-color:white;
+	filter:progid:DXImageTransform.Microsoft.Gradient(startColorstr=#DDEEFF, endColorstr=#99AAFF);
+}
+.divFadedBG{
+	background-color:#FFFFFF;
+	filter:progid:DXImageTransform.Microsoft.Alpha(opacity=60);
+	height:100%;
+	width:100%;
+	z-index:-1;
+}
+.button{
+	border-top:1px solid white;
+	border-left:1px solid white;
+	border-right:1px solid #66AAFF;
+	border-bottom:1px solid #66AAFF;
+	filter:progid:DXImageTransform.Microsoft.Gradient(endColorstr=#66AAFF, startColorstr=white);
+	background:#CCE2FF;
+	zoom:100%;	
+}
+</style>
+<base target="_self">
+<script language="JScript">
+/****************************************************
+ * Initializes the array and regular expression for *
+ * validating pattern methods.                      *
+ ****************************************************/
+var patternMethods = new Array();
+patternMethods.push("RLZ");	// Remove Leading Zero
+patternMethods.push("D-S");	// Dots to Spaces
+patternMethods.push("P-S");	// Propercased words to Spaced words
+patternMethods.push("U-S");	// Underscores to Spaces
+patternMethods.push("LC");	// LowerCase
+patternMethods.push("PC");	// ProperCase
+patternMethods.push("UC");	// UpperCase
+// Add to or Subtract from the Matched Number
+patternMethods.push("[\\+-][1-9]\\d*");
+// Matched Number Subtracts from Specified Number
+patternMethods.push("[1-9]\\d*-");
+
+var fso = new ActiveXObject("Scripting.FileSystemObject");
+var shellApp = new ActiveXObject("Shell.Application");
+var files = new Array();
+
+window.onload = function init()
+{
+  clearFilesList();
+  gE("aErrCapRegExp").style.display = "none";
+  gE("aErrRepPat").style.display = "none";
+}
+
+function browseForFolder()
+{
+	try
+	{
+		var obj = shellApp.BrowseForFolder(0, "Select the desired folder:", 1);
+		if(obj == null)
+			return;
+		str = obj.Self.Path;
+		clearFilesList();
+		createFilesList(str);
+	}
+	catch(e)
+	{
+		clearFilesList();
+		alert("The following error occurred:\r\n" + e.description);
+		return;
+	}
+}
+
+function clearFilesList()
+{
+  gE("txtDir").value = "";
+  files = new Array();
+  var tbl = gE("tblFiles");
+  while(tbl.rows.length > 1)
+  {
+    tbl.deleteRow();
+  }
+}
+
+function createFilesList(root)
+{
+  gE("txtDir").value = str;
+
+  var tbl = gE("tblFiles");
+  getFiles(root, Infinity);
+
+  var tr, td, input;
+  for(var i = 0; i < files.length; i++)
+  {
+    tr = tbl.insertRow();
+
+    td = tr.insertCell();
+    input = document.createElement("INPUT");
+    input.type = "text";
+    input.className = "maskedTextbox";
+    input.value = files[i].Name;
+    input.contentEditable = false;
+    input.tabIndex = -1;
+    td.appendChild(input);
+    td.onclick = new Function('gE("tblFiles").rows(' + (i + 1) + ').cells(1).all.tags("INPUT")[0].focus()');
+    td.ondblclick = new Function("resetFile(" + i + ")");
+    td.oncontextmenu = new Function("showFileInfo(" + i + "); return false");
+
+    td = tr.insertCell();
+    input = document.createElement("INPUT");
+    input.type = "text";
+    input.className = "textbox";
+    input.value = files[i].Name;
+    input.onfocus = new Function("hiliteFile(" + i + ", true)");
+    input.onblur = new Function("hiliteFile(" + i + ", false); checkFilename(" + i + ")");
+    td.appendChild(input);
+  }
+}
+
+function resetFile(intFile)
+{
+  intFile++;
+  var input0 = gE("tblFiles").rows(intFile).all.tags("INPUT")[0];
+  var input1 = gE("tblFiles").rows(intFile).all.tags("INPUT")[1];
+  input1.value = input0.value;
+  input1.select();
+}
+
+function showFileInfo(intFile)
+{
+  alert("Path:  " + files[intFile].Path.toString().replace(/[^\\\/]*$/, "")
+    + "\nName:  " + files[intFile].Name
+    + "\nAlternate Name:  " + gE("tblFiles").rows(intFile + 1).all.tags("INPUT")[1].value);
+}
+
+function hiliteFile(intFile, blnHilite)
+{
+  intFile++;
+  var className = (blnHilite ? "tdHilite" : "");
+  gE("tblFiles").rows(intFile).cells(0).className = className;
+  gE("tblFiles").rows(intFile).cells(1).className = className;
+}
+
+function checkFilename(intFile)
+{
+  input = gE("tblFiles").rows(intFile+1).all.tags("INPUT")[1];
+  name = input.value.replace(/\s+/g, " ")
+       .replace(/^[\.\s]+|[\.\s]+$/g, "")
+       .replace(/[\\\/\|\?\:\*<>"]+/g, "_");
+
+  if(name == "")
+  {
+    name = files[intFile].Name.toString();
+  }
+  else
+  {
+    //ext = files[intFile].Name.toString().replace(/^.+?(\.\w+)?$/, "$1");
+    //if( !(new RegExp("\\" + ext + "$")).test(name) )
+    //  name += ext;
+  }
+
+  input.value = name;
+}
+
+function getFiles(dir, maxLevelsDown)
+{
+  var srcFolder = fso.GetFolder(dir);
+
+  // Loops through all files
+  var o = new Enumerator(srcFolder.files);
+  var n = 0;
+  for(var f; !o.atEnd(); o.moveNext() )
+  {
+    files.push(o.item());
+    n++;
+  }
+
+  // Loops through all subdirectories
+  if(maxLevelsDown > 0)
+  {
+    var esub = new Enumerator( srcFolder.SubFolders );
+    for(; !esub.atEnd(); esub.moveNext())
+      getFiles(dir + "\\" + fso.GetFolder( esub.item() ).Name, maxLevelsDown - 1);
+  }
+}
+
+function showHelp(index)
+{
+  var helps = [new Array(), new Array()];
+  helps[0].push("This is the regular expression used to match up to the filename.");
+  helps[0].push("In order to capture certain parts of the match, place parentheses around that sub-expression.");
+  helps[0].push("Each sub-expression grouped by using parentheses can be accessed by the pattern.");
+  helps[1].push("This is the format to which you would like your filenames to conform.");
+  helps[1].push("In order to use a grouped sub-expression, surround the index number of the group with <>.");
+  helps[1].push("For example:");
+  helps[1].push("\tEpisode <1> - <2>");
+  helps[1].push("");
+  helps[1].push("You can use the following functions on any grouped sub-expression:");
+  helps[1].push("- RLZ\t// Remove Leading Zero(s)");
+  helps[1].push("- D-S\t// Dots to Spaces");
+  helps[1].push("- P-S\t// Propercased words to Spaced words");
+  helps[1].push("- U-S\t// Underscores to Spaces");
+  helps[1].push("- LC\t// Lower Case");
+  helps[1].push("- PC\t// Proper Case");
+  helps[1].push("- UC\t// Upper Case");
+	helps[1].push("- [+-]\d+\t Add to or Subtract from a Number");
+	helps[1].push("- \d+-\t Matched Number Subtracts from It");
+  helps[1].push("");
+  helps[1].push("Examples of the regular expressions along with their patterns:");
+  helps[1].push("Exp1:\t.*?(\\d)+-(.+)\\.(\\w+)");
+  helps[1].push("Pat1:\tEpisode <1,RLZ> - <2,D-S,PC>.<3>");
+  helps[1].push("Exp2:\t\\d+(\\w+)_(\\.\\w+)");
+  helps[1].push("Pat2:\tAbbreviation <1,UC> <2>");
+  helps[1].push("Exp3:\t\\w(\\d) (...)(..)(\\.\\w+)");
+  helps[1].push("Pat3:\t<3,LC> [<1,RLZ>]<4>");
+  helps[1].push("Exp4:\tM4V200(\\d+)\\.(\\w+)");
+  helps[1].push("Pat4:\tEpisode <1,+2>.<4,LC>");
+  helps[1].push("Exp5:\tM4A400(\\d+)\\.(\\w+)");
+  helps[1].push("Pat5:\tEpisode <1,41->.<4,LC>");
+
+  alert(helps[index].join("\r\n"));
+}
+
+function checkMask()
+{
+  var success = true;
+  function f(s)
+  {
+    eval("check"+s+"()");
+    if((count = gE("txt"+s).err.length) == 0)
+      gE("aErr"+s).style.display = "none";
+    else
+    {
+      success = false;
+      gE("aErr"+s).style.display = "block";
+      gE("aErr"+s).innerHTML = (count > 1 ? "[See&nbsp;Errors]" : "[See&nbsp;Error]");
+    }
+  }
+
+  f("CapRegExp");
+  f("RepPat");
+
+  return success;
+}
+
+function checkCapRegExp()
+{
+  var txt = gE("txtCapRegExp");
+  txt.value = txt.value.replace(/^\/?\^?|\$?(\/[gim]*)?$|^\s+$/g, "");
+  txt.err = new Array();
+  var str = txt.value;
+
+  txt.subCount = str.replace(/\\\(|\\\)/g, "").replace(/[^\(\)]+/g, "").match(/\(\)/g);
+  txt.subCount = (txt.subCount == null ? 0 : txt.subCount.length);
+
+  if(txt.value != "" && txt.subCount == 0)
+    txt.err.push("No sub-expression groups were captured");
+
+  try
+  {
+    new RegExp("^" + str + "$", "i");
+  }
+  catch(err)
+  {
+    txt.err.push(err.description);
+  }
+}
+
+function checkRepPat()
+{
+  var txt = gE("txtRepPat");
+  txt.value = txt.value.replace(/^\s+$/, "");
+  txt.err = new Array();
+  var str = txt.value;
+
+  var subCount = gE("txtCapRegExp").subCount;
+  var regExpIsEmpty = (gE("txtCapRegExp").value == "");
+
+  var exp = /<\s*\d+\s*(,\s*[\w\-]*\s*)*>/g;
+  txt.subs = str.match(exp);
+  if(txt.subs == null)
+    txt.subs = new Array();
+  str = str.replace(exp, "");
+  exp = new RegExp("<\\s*\\d+\\s*(,\\s*(" + patternMethods.join("|")
+		+ ")\\s*)*>", "i");
+
+  if(txt.value != "" && txt.subs.length == 0)
+    txt.err.push("No sub-expression groups were used");
+
+  for(var i = 0; i < txt.subs.length; i++)
+  {
+    if( !regExpIsEmpty && parseInt(txt.subs[i].match(/\d+/)[0]) > subCount )
+      txt.err.push("invalid group number for " + txt.subs[i]);
+    if( !(exp).test(txt.subs[i]) )
+      txt.err.push("one or more invalid functions found in " + txt.subs[i]);
+  }
+
+  if( (chars = str.replace(/[^<>]/g, "")) != "" )
+    txt.err.push("invalid character"
+       + (chars.length > 1 ? "s" : "")
+       + "; valid only if used to represent a sub-expression:  " + chars);
+
+  if( (chars = str.replace(/[^\\\/\:\*\?\"\|]/g, "")) != "" )
+    txt.err.push("invalid character" + (chars.length > 1 ? "s" : "") + ":  "
+			+ chars);
+}
+
+function showError(txt)
+{
+  var name = (txt == "txtCapRegExp" ? "Capturing Regular Expression" : "Replacement Pattern");
+  txt = gE(txt);
+  alert("The following error"
+       + (txt.err.length > 1 ? "s" : "")
+       + " occurred within the " + name
+       + ":\n- " + txt.err.join("\n- "));
+  txt.select();
+}
+
+function maskAllFiles(allFiles)
+{
+  if(!checkMask())
+  {
+    alert("You must resolve all errors before using the filename mask.");
+    return;
+  }
+
+  var exp = (gE("txtCapRegExp").value == "" ? null : new RegExp("^" + gE("txtCapRegExp").value + "$", "i"));
+  var pat = gE("txtRepPat").value.match(/<.+?>|[^<]+/g);
+
+  var inputs = gE("tblFiles").all.tags("INPUT");
+  for(var i = 0, len = inputs.length; i < len; i+=2)
+  {
+    if(exp == null || pat == null)
+      inputs[i+1].value = inputs[i].value;
+    else if( allFiles || (!allFiles && inputs[i].value == inputs[i+1].value) )
+    {
+      inputs[i+1].value = inputs[i].value.usePattern(exp, pat);
+      checkFilename(i >> 1);
+    }
+  }
+}
+
+/***************************************************
+ * Adds usePattern function to the String object.  *
+ * Returns an altered form of the original string  *
+ * based regular expression and pattern used.      *
+ * Parameters:                                     *
+ * - exp = regular expression that parses the      *
+ *         current string                          *
+ * - pat = pattern array that is used to alter the *
+ *         current string                          *
+ ***************************************************/
+String.prototype.usePattern = function(exp, pat)
+{
+  var arr = this.match(exp);
+  if(arr == null)
+    return this;
+
+  // Remove first element
+  arr.shift();
+  var str = "";
+  var str2 = "";
+  for(var o, i = 0; i < pat.length; i++)
+  {
+    if(pat[i].charAt(0) == '<')
+    {
+      o = pat[i].replace(/[<\s>]+/g, "").split(",");
+      o[0] = parseInt(o[0]) - 1;
+
+      str2 = arr[o[0]];
+
+      for(var n = 1; n < o.length; n++)
+      {
+        switch(o[n].toUpperCase())
+        {
+          case "RLZ":
+            str2 = str2.replace(/^0+(\d)/, "$1");
+            break;
+          case "D-S":
+            str2 = str2.replace(/\.+/g, " ");
+            break;
+          case "P-S":
+            str2 = str2.replace(/([A-Z])/g, " $1");
+            break;
+          case "U-S":
+            str2 = str2.replace(/_+/g, " ");
+            break;
+          case "LC":
+            str2 = str2.toLowerCase();
+            break;
+          case "PC":
+            str2 = str2.toProperCase();
+            break;
+          case "UC":
+            str2 = str2.toUpperCase();
+            break;
+					default:
+						if(!isNaN(str2))
+						{
+							if(/^[\+\-][1-9]\d*$/.test(o[n]))
+								str2 = eval(str2 + RegExp.lastMatch);
+							else if(/^[1-9]\d*\-$/.test(o[n]))
+								str2 = eval(RegExp.lastMatch + str2);
+						}
+						break;
+        }
+      }
+
+      str += str2;
+    }
+    else
+    {
+      str += pat[i];
+    }
+  }
+  return str;
+}
+
+function renameFiles()
+{
+  if(files.length == 0)
+    return;
+
+  var inputs = gE("tblFiles").all.tags("INPUT");
+  var path, name, newName;
+  var renamedCount = 0;
+  var erred = false;
+  for(var i = 0; i < files.length; i++)
+  {
+    path = files[i].Path.replace(/[^\\\/]+$/, "");
+    name = files[i].Name;
+    newName = inputs[(i << 1) + 1].value;
+    if(name != newName)
+    {
+      try
+      {
+        fso.MoveFile(path + name, path + newName);
+        renamedCount++;
+      }
+      catch(err)
+      {
+        alert('An error occurred while attempting to\nrename "'
+             + name + '"\nas "' + newName + '"\nin "' + path + '"\nbecause '
+             + err.description.replace(/(\w)/, function($1){return $1.toLowerCase()}) + '.');
+        erred = true;
+      }
+    }
+  }
+
+  var msg = renamedCount + " out of " + files.length + " files were successfully renamed.";
+  if(erred || renamedCount < files.length)
+    erred = confirm(msg + "\nWould you like to continue editing?");
+  else
+    alert(msg);
+
+  strDir = gE("txtDir").value;
+
+  clearFilesList();
+  if(erred)	// only if user wants to continue editing
+    createFilesList(strDir);
+}
+
+/****************************************************
+ * Adds toProperCase function to the String object. *
+ * Makes the first letter of each word capitalized. *
+ ****************************************************/
+String.prototype.toProperCase = function()
+{
+  return this.replace(/((^|\s)[a-z])/g, function($1){ return $1.toUpperCase()});
+}
+
+function gE(id)
+{
+  return document.getElementById(id);
+}
+</script>
+</head>
+<body>
+
+<table id="tblBG" border=0 cellspacing=0><tr>
+<td id="tdBGTop"></td>
+</tr><tr>
+<td id="tdBGBottom"></td>
+</tr></table>
+
+<div id="divAll">
+<table id="tblAll" border=0><tr>
+<td>
+
+<table id="tblOptions" border=0 cellpadding=2 cellspacing=2><tr>
+<td colspan=2>
+
+<table border=0 cellpadding=0 cellspacing=0 width="100%"><tr>
+<td><label for="txtDir">Root&nbsp;Directory:</label></td>
+<td width="99%"><input id="txtDir" type="text" class="textbox" value="" CONTENTEDITABLE="false" onclick="gE('txtDir').select()"></td>
+<td><input type="button" class="button" value="Browse For A Folder" onclick="browseForFolder()"></td>
+</tr></table>
+
+</td>
+</tr><tr>
+<td style="border:1px solid white; border-left:none" width="50%">
+
+<table border=0 width="100%"><tr>
+<th align="left"><label for="txtCapRegExp">Capturing&nbsp;Regular&nbsp;Expression&nbsp;<a href="javascript:showHelp(0)" tabIndex="-1">(help)</a>:</label></th>
+<th align="right"><a id="aErrCapRegExp" href="javascript:showError('txtCapRegExp')" tabIndex="-1">[See&nbsp;Error(s)]</a></th>
+</tr><tr>
+<td colspan=2><input id="txtCapRegExp" class="textbox" type="text" onchange="checkMask()" value=""></td>
+</tr></table>
+
+</td>
+<td style="border:1px solid white; border-right:none" width="50%">
+
+<table border=0 width="100%"><tr>
+<th align="left"><label for="txtRepPat">Replacement&nbsp;Pattern&nbsp;<a href="javascript:showHelp(1)" tabIndex="-1">(help)</a>:</label></th>
+<th align="right"><a id="aErrRepPat" href="javascript:showError('txtRepPat')" tabIndex="-1">[See&nbsp;Error(s)]</a></th>
+</tr><tr>
+<td colspan=2><input id="txtRepPat" class="textbox" type="text" onchange="checkMask()" value=""></td>
+</tr></table>
+
+</td>
+</tr><tr>
+<td align="center" colspan=2>
+<input type="button" class="button" value="Mask Unchanged Files" onclick="maskAllFiles(false)">
+<input type="button" class="button" value="Mask All Files" onclick="maskAllFiles(true)">
+<input type="button" class="button" value="Rename Files" onclick="renameFiles()">
+</td>
+</tr></table>
+<!-- End of tblOptions -->
+
+</td>
+</tr><tr>
+<td height="99%">
+
+<div id="divFiles">
+<table id="tblFiles" border=0 cellpadding=2 cellspacing=0><tr>
+<th>Original Filename</th>
+<th>New Filename</th>
+</tr></table>
+</div>
+<!-- End of divFiles -->
+
+<div class="divFadedBG"></div>
+
+</td>
+</tr></table>
+</div>
+<!-- End of divAll -->
+
+</body>
+</html>
